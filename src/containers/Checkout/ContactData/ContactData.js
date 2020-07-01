@@ -1,10 +1,13 @@
 import React, { Component } from "react";
+import { connect } from 'react-redux';
 import Button from '../../../components/UI/Button/Button';
 import classes from './ContactData.module.css';
 import axios from '../../../axios-orders';
 import Spinner from '../../../components/UI/Spinner/Spinner';
 import Input from '../../../components/UI/Input/Input';
-
+import withErrorHandler from '../../../hoc/withErroHandler/withErrorHandler';
+import * as actions from '../../../store/actions/index';
+import { checkValidity } from '../../../shared/utility';
 
 class ContactData extends Component {
     state = {
@@ -90,8 +93,8 @@ class ContactData extends Component {
                 valid: true
             },
         },
-        formIsValid: false,
-        loading: false
+        formIsValid: false
+
     }
 
     orderHandler = (event) => {
@@ -101,43 +104,18 @@ class ContactData extends Component {
         for (let formElementIdentifier in this.state.orderForm) {
             formData[formElementIdentifier] = this.state.orderForm[formElementIdentifier].value;
         }
-        console.log(formData);
+
         const order = {
-            ingredients: this.props.ingredients,
+            ingredients: this.props.ings,
             price: this.props.price,
-            orderData: formData
+            orderData: formData,
+            userId: this.props.userId
         }
-        axios.post('/orders.json', order)
-            .then(res => {
-                this.setState({ loading: false });
-                this.props.history.push('/');
-            })
-            .catch(error => {
-                this.setState({ loading: false })
-            });
+        this.props.onOrderBurger(order, this.props.token);
+
+
     }
 
-    checkValidity(value, rules) {
-        let isValid = true;
-
-        if(!rules) {
-            return true;
-        }
-
-        if (rules.required) {
-            isValid = value.trim() !== '' && isValid;
-        }
-
-        if (rules.minLength) {
-            isValid = value.length >= rules.minLength && isValid;
-        }
-
-        if (rules.maxLength) {
-            isValid = value.length <= rules.maxLength && isValid;
-        }
-
-        return isValid;
-    }
 
     InputChangeHandler = (event, inputIdentifier) => {
         const updatedOrderForm = {
@@ -148,7 +126,7 @@ class ContactData extends Component {
             ...updatedOrderForm[inputIdentifier]
         };
         updatedFormElement.value = event.target.value;
-        updatedFormElement.valid = this.checkValidity(updatedFormElement.value, updatedFormElement.validation);
+        updatedFormElement.valid = checkValidity(updatedFormElement.value, updatedFormElement.validation);
         updatedFormElement.touched = true;
         updatedOrderForm[inputIdentifier] = updatedFormElement;
 
@@ -156,7 +134,7 @@ class ContactData extends Component {
         for (let inputIdentifier in updatedOrderForm) {
             formIsValid = updatedOrderForm[inputIdentifier].valid && formIsValid;
         }
-        
+
         this.setState({ orderForm: updatedOrderForm, formIsValid: formIsValid });
     }
 
@@ -185,7 +163,7 @@ class ContactData extends Component {
                     btnType="Success"
                     disabled={!this.state.formIsValid}>ORDER</Button>
             </form>);
-        if (this.state.loading) {
+        if (this.props.loading) {
             form = <Spinner />
         }
         return (
@@ -199,4 +177,23 @@ class ContactData extends Component {
 
 }
 
-export default ContactData;
+const mapStateToProps = state => {
+    return {
+        ings: state.burgerBuilder.ingredients,
+        price: state.burgerBuilder.totalPrice,
+        loading: state.order.loading,
+        token: state.auth.token,
+        userId: state.auth.userId
+    }
+};
+
+const mapDispatchToProps = dispatch => {
+    return {
+        onOrderBurger: (orderData, token) => dispatch(actions.purchaseBurger(orderData, token))
+    };
+
+};
+
+
+
+export default connect(mapStateToProps, mapDispatchToProps)(withErrorHandler(ContactData, axios));
